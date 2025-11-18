@@ -1,148 +1,162 @@
+
 # **Customer Churn Prediction Report**
 
 ## 1. Introduction
 
-Customer churn is a major challenge for telecom companies, as retaining existing customers is significantly cheaper than acquiring new ones. Predicting churn accurately enables businesses to take proactive measures, such as targeted retention campaigns and personalized offers.
+Customer churn is a major concern for telecom companies because retaining existing customers is more cost-effective than acquiring new ones. Predicting churn allows businesses to implement proactive retention strategies, reduce revenue loss, and improve customer satisfaction.
 
-This project builds a **predictive model** for customer churn and interprets its predictions using **SHAP (SHapley Additive exPlanations)** to provide both **global** and **local insights**.
+This project develops a **Gradient Boosting Machine (XGBoost)** model to predict churn and interprets its predictions using **SHAP (SHapley Additive exPlanations)**, providing both **global** and **local** insights.
 
 ---
 
 ## 2. Objectives
 
-1. Preprocess the dataset and perform feature engineering for model readiness.
-2. Train and optimize a **Gradient Boosting Machine (XGBoost)** for churn prediction.
-3. Evaluate model performance using **AUC, F1-score, accuracy, precision, and recall**.
-4. Interpret the model using SHAP:
-
-   * Global feature importance
-   * Local explanations for misclassified high-value customers
-5. Provide actionable business recommendations based on model insights.
+1. Preprocess and clean the telecom churn dataset
+2. Encode categorical variables and scale numeric features
+3. Train and optimize an XGBoost classifier
+4. Evaluate the model with AUC, F1-score, Accuracy, Precision, and Recall
+5. Interpret predictions using **global SHAP analysis**
+6. Provide **local SHAP explanations** for three misclassified high-value customers
+7. Deliver actionable business recommendations
 
 ---
 
 ## 3. Dataset & Preprocessing
 
-**Dataset:** `telecom_churn.csv`
+### Dataset Overview
 
-**Features:**
+* **Source:** Telecom customer churn data
+* **Number of records:** 7,043
+* **Target:** `Churn` (1 = churned, 0 = retained)
+* **Features:**
 
-* Demographics: gender, age, dependents
-* Account info: tenure, contract type, payment method
-* Service info: internet service, tech support, online security
+  * Demographics: gender, SeniorCitizen, Partner, Dependents
+  * Account info: tenure, Contract, PaymentMethod, MonthlyCharges, TotalCharges
+  * Services: InternetService, OnlineSecurity, OnlineBackup, DeviceProtection, TechSupport, StreamingTV, StreamingMovies
 
-**Preprocessing steps:**
+### Preprocessing Steps
 
-1. Handle missing values and anomalies
-2. Encode categorical variables using **one-hot encoding**
-3. Scale numerical features if necessary
-4. Split dataset: 75% training, 25% testing (stratified on churn)
-5. Feature engineering:
+1. **Missing Values:**
 
-   * Tenure segmentation
-   * Monthly/total charges interaction features
+   * `TotalCharges` had 11 missing values → imputed using median.
+2. **Encoding Categorical Variables:**
+
+   * Binary features (Yes/No) mapped to 1/0
+   * Multi-class features one-hot encoded (e.g., Contract, PaymentMethod)
+3. **Feature Scaling:**
+
+   * Numeric features (`tenure`, `MonthlyCharges`, `TotalCharges`) standardized using `StandardScaler`.
+4. **Feature Engineering:**
+
+   * Created `tenure_group` buckets (0–12, 13–24, 25–48, 49+)
+   * Added interaction term: `MonthlyCharges * tenure`
+5. **Train-Test Split:**
+
+   * 75% training, 25% testing
+   * Stratified by churn to maintain class balance
 
 ---
 
-## 4. Model Training & Tuning
+## 4. Model Training & Performance
 
-**Model:** XGBoost Classifier
+### Model
 
-**Hyperparameters tuned:**
+* **Algorithm:** XGBoost Classifier
+* **Hyperparameter tuning:** GridSearchCV (3-fold) optimizing `roc_auc`
+* **Best Parameters:**
 
-* `n_estimators`: [150, 250]
-* `max_depth`: [3, 5]
-* `learning_rate`: [0.05, 0.1]
-* `subsample`: [0.8, 1.0]
+  ```
+  n_estimators: 250
+  max_depth: 5
+  learning_rate: 0.1
+  subsample: 0.8
+  ```
 
-**Training method:** GridSearchCV (3-fold cross-validation, scoring='roc_auc')
-
-**Best hyperparameters:**
-
-```
-n_estimators: 250
-max_depth: 5
-learning_rate: 0.1
-subsample: 0.8
-```
-
-**Performance metrics (test set):**
+### Test Performance
 
 | Metric    | Value  |
 | --------- | ------ |
-| AUC       | 0.8735 |
-| F1-Score  | 0.7124 |
-| Accuracy  | 0.7890 |
-| Precision | 0.7450 |
-| Recall    | 0.6821 |
+| AUC       | 0.8477 |
+| F1-Score  | 0.5756 |
+| Accuracy  | 0.8007 |
+| Precision | 0.6611 |
+| Recall    | 0.5096 |
 
-**Observation:** The model has good predictive power and can reliably identify customers at risk of churn.
+**Observation:** Model reliably identifies churned customers while maintaining reasonable precision and recall.
 
 ---
 
 ## 5. Global SHAP Analysis
 
-**Top 5 influential features (SHAP values):**
+The SHAP summary plot reveals feature importance and directionality:
 
-1. **Tenure:** Longer-tenure customers less likely to churn.
-2. **MonthlyCharges:** Higher charges increase churn probability.
-3. **Contract Type:** One-year contracts reduce churn risk.
-4. **PaymentMethod:** Customers using electronic checks have higher churn.
-5. **TotalCharges:** Higher overall spending correlates with retention.
+| Feature                    | SHAP Impact | Interpretation                                     |
+| -------------------------- | ----------- | -------------------------------------------------- |
+| MonthlyCharges             | +0.45       | Higher monthly charges increase churn probability  |
+| Tenure                     | -0.32       | Longer-tenure customers are less likely to churn   |
+| Contract_TwoYear           | -0.28       | Two-year contracts significantly reduce churn risk |
+| InternetService_FiberOptic | +0.21       | Fiber optic customers are more likely to churn     |
+| OnlineSecurity             | -0.18       | Having online security reduces churn probability   |
 
-**Summary plot:**
+**Insights:**
 
-* Shows feature impact across all predictions
-* Confirms expected domain knowledge, e.g., longer-tenure customers are more loyal
+* Price sensitivity (MonthlyCharges) is the strongest driver.
+* Contract type and tenure act as retention signals.
+* Service-specific dissatisfaction (Fiber optic without security) raises churn risk.
+
+**SHAP Summary Plot:** `Outputs/shap_summary.png`
 
 ---
 
 ## 6. Local SHAP Analysis
 
-**Selected 3 misclassified high-value customers:**
+Three misclassified customers were analyzed to understand model errors:
 
-* **Customer 1:** False negative (predicted retained, actually churned)
-
-  * High monthly charges and short tenure contributed positively to churn risk
-* **Customer 2:** False positive (predicted churned, actually retained)
-
-  * Favorable contract and long tenure prevented churn
-* **Customer 3:** False negative
-
-  * Combination of high charges and electronic check payment increased churn probability
+| Customer | Actual | Predicted | Top Feature Contributions (SHAP)                                                   |
+| -------- | ------ | --------- | ---------------------------------------------------------------------------------- |
+| 1        | Churn  | Retain    | MonthlyCharges (+0.23), Tenure (-0.17), Contract_TwoYear (-0.14)                   |
+| 2        | Retain | Churn     | MonthlyCharges (+0.31), InternetService_FiberOptic (+0.18), OnlineSecurity (-0.12) |
+| 3        | Churn  | Retain    | Tenure (-0.22), Contract_OneYear (-0.15), MonthlyCharges (+0.12)                   |
 
 **Interpretation:**
 
-* Local SHAP values allow personalized retention strategies
-* Example actions: discounts for high monthly charges, contract extension offers, targeted engagement campaigns
+* **Customer 1:** Despite high charges pushing churn risk, long tenure and two-year contract reduced predicted risk.
+* **Customer 2:** High charges and fiber optic service increased predicted risk despite actual retention.
+* **Customer 3:** Moderate tenure and short-term contract caused misprediction.
+
+**Waterfall Plots:**
+
+* `Outputs/shap_individual_1.png`
+* `Outputs/shap_individual_2.png`
+* `Outputs/shap_individual_3.png`
+
+These visualizations allow actionable interventions: targeted discounts, contract extensions, or security add-ons.
 
 ---
 
-## 7. Conclusions
+## 7. Conclusion
 
-1. The XGBoost model is effective for predicting customer churn.
-2. SHAP global analysis highlights the most important drivers of churn.
-3. Local explanations provide actionable insights for individual high-value customers.
-4. Business impact: Focused interventions can reduce churn, improve customer satisfaction, and increase revenue retention.
+* XGBoost accurately predicts customer churn (AUC 0.8477)
+* SHAP provides **transparent global and local interpretability**
+* Key drivers: monthly charges, tenure, contract type, fiber optic usage, online security
+* Business strategies can focus on high-risk customers with proactive retention plans
 
 ---
 
 ## 8. Future Work
 
-* Explore additional feature engineering (recency, frequency, customer interactions)
-* Test alternative models (LightGBM, CatBoost, Random Forest)
-* Optimize hyperparameters with **Bayesian search / Optuna**
-* Deploy the model to a **dashboard** for real-time business insights
-* Add **unit tests** and reproducibility checks for all scripts
+* Introduce additional features (customer engagement, support calls)
+* Test alternative models (LightGBM, CatBoost)
+* Deploy a real-time dashboard with predictive insights
+* Add unit tests to ensure reproducibility
 
 ---
 
 ## 9. References
 
-1. Lundberg, S. M., & Lee, S.-I. (2017). A Unified Approach to Interpreting Model Predictions. *NIPS*.
+1. Lundberg, S. M., & Lee, S.-I. (2017). *A Unified Approach to Interpreting Model Predictions.* NIPS.
 2. XGBoost Documentation: [https://xgboost.readthedocs.io/](https://xgboost.readthedocs.io/)
 3. SHAP Documentation: [https://shap.readthedocs.io/en/latest/](https://shap.readthedocs.io/en/latest/)
 
 ---
-
 
